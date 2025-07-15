@@ -26,6 +26,60 @@ async function run() {
   try {
     await client.connect();
     const UsersCollection = client.db('Daily-Headline-360-DB').collection('users');
+    const publishersCollection = client.db('Daily-Headline-360-DB').collection('publishers');
+
+    
+
+    //* read 
+    app.get('/users', async (req, res)=>{
+        const result = await UsersCollection.find().toArray()
+        res.send(result)
+    })
+
+    //* user role
+    app.get('/users/role/:email', async (req, res)=>{
+        const query = {email: req.params.email};
+        const result = await UsersCollection.findOne(query)
+        res.send(result)
+    })
+
+    //* create users DB
+    app.post("/users", async (req, res) => {
+      const {email, name, img}= req.body;
+      console.log(email)
+
+      const user = {
+        name,
+        img,
+        email,
+        role: 'user',
+        premiumToken: null,
+        created_at: new Date().toISOString(),
+        last_log_in: new Date().toISOString()
+      }
+
+      const userExists = await UsersCollection.findOne({ email });
+      if (userExists) {
+        if(email){
+          await UsersCollection.updateOne({email}, { $set: { last_log_in: new Date().toISOString()} } )
+        }
+        return res
+          .status(200)
+          .send({ message: "user already exists", inserted: false });
+      }
+      
+      const result = await UsersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    //* add publisher DB
+    app.post('/publishers', async (req, res) =>{
+      const {name, logo} = req.body;
+      const result = await publishersCollection.insertOne({name, logo, created_at: new Date().toISOString()})
+
+      res.send(result)
+    })
+
 
 
 
