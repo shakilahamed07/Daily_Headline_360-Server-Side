@@ -98,6 +98,61 @@ async function run() {
       res.send(result);
     });
 
+    //* get all articles
+    app.get("/articles", async (req, res) => {
+      const result = await articlesCollection.find().sort({ posted_date: -1 }).toArray();
+      res.send(result);
+    });
+
+    //* approve article 
+    app.patch("/approve/article/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const updateDoc ={
+        $set: {status: 'approved'},
+      }
+
+      const result = await articlesCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    //* premium or free article 
+    app.patch("/premium/article/:id", async (req, res) => {
+      const id = req.params.id;
+      const value = req.body.value;
+      const query = {_id: new ObjectId(id)}
+      const updateDoc ={
+        $set: {isPremium: value},
+      }
+
+      const result = await articlesCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    //*  article decline
+    app.patch("/articles/decline/:declineId", async (req, res) => {
+      const id = req.params.declineId;
+      const reason = req.body.reason;
+      const query = {_id: new ObjectId(id)}
+      const updateDoc ={
+        $set: {decline_reason: reason, status: 'decline'},
+      }
+
+      const result = await articlesCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    //* Delate article 
+    app.delete("/delete/article/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await articlesCollection.deleteOne(query);
+      res.send(result);
+    });
+
+
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
