@@ -23,9 +23,15 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     await client.connect();
-    const UsersCollection = client.db("Daily-Headline-360-DB").collection("users");
-    const publishersCollection = client.db("Daily-Headline-360-DB").collection("publishers");
-    const articlesCollection = client.db("Daily-Headline-360-DB").collection("articles");
+    const UsersCollection = client
+      .db("Daily-Headline-360-DB")
+      .collection("users");
+    const publishersCollection = client
+      .db("Daily-Headline-360-DB")
+      .collection("publishers");
+    const articlesCollection = client
+      .db("Daily-Headline-360-DB")
+      .collection("articles");
 
     //* read
     app.get("/users", async (req, res) => {
@@ -100,30 +106,63 @@ async function run() {
 
     //* get all articles
     app.get("/articles", async (req, res) => {
-      const result = await articlesCollection.find().sort({ posted_date: -1 }).toArray();
+      const result = await articlesCollection
+        .find()
+        .sort({ posted_date: -1 })
+        .toArray();
       res.send(result);
     });
 
-    //* approve article 
+    //* GET /articles?publisher=Daily%20Headline%20360&tags=Technology,Sports&search=starlink
+    app.get("/approved/articles", async (req, res) => {
+      const { publisher, tags, search } = req.query;
+
+      const filter = { status: "approved" };
+
+      // Filter by publisher
+      if (publisher) {
+        filter["publisher"] = publisher;
+      }
+
+      // Filter by tags (can be comma-separated)
+      if (tags) {
+        const tagArray = tags.split(",");
+        filter.tags = { $in: tagArray };
+      }
+
+      // Search by title (case-insensitive)
+      if (search) {
+        filter.title = { $regex: search, $options: "i" };
+      }
+
+      const result = await articlesCollection
+        .find(filter)
+        .sort({ posted_date: -1 })
+        .toArray();
+
+      res.send(result);
+    });
+
+    //* approve article
     app.patch("/approve/article/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
-      const updateDoc ={
-        $set: {status: 'approved'},
-      }
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: { status: "approved" },
+      };
 
       const result = await articlesCollection.updateOne(query, updateDoc);
       res.send(result);
     });
 
-    //* premium or free article 
+    //* premium or free article
     app.patch("/premium/article/:id", async (req, res) => {
       const id = req.params.id;
       const value = req.body.value;
-      const query = {_id: new ObjectId(id)}
-      const updateDoc ={
-        $set: {isPremium: value},
-      }
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: { isPremium: value },
+      };
 
       const result = await articlesCollection.updateOne(query, updateDoc);
       res.send(result);
@@ -133,25 +172,22 @@ async function run() {
     app.patch("/articles/decline/:declineId", async (req, res) => {
       const id = req.params.declineId;
       const reason = req.body.reason;
-      const query = {_id: new ObjectId(id)}
-      const updateDoc ={
-        $set: {decline_reason: reason, status: 'decline'},
-      }
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: { decline_reason: reason, status: "decline" },
+      };
 
       const result = await articlesCollection.updateOne(query, updateDoc);
       res.send(result);
     });
 
-    //* Delate article 
+    //* Delate article
     app.delete("/delete/article/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) };
       const result = await articlesCollection.deleteOne(query);
       res.send(result);
     });
-
-
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
