@@ -113,6 +113,22 @@ async function run() {
       res.send(result);
     });
 
+    //* get all premium articles
+    app.get("/premium-articles", async (req, res) => {
+      const result = await articlesCollection
+        .find({isPremium: true})
+        .sort({ posted_date: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    //* get single article
+    app.get("/article-details/:id", async (req, res) => {
+      const query = {_id: new ObjectId(req.params.id)};
+      const result = await articlesCollection.findOne(query);
+      res.send(result);
+    });
+
     //* GET /articles?publisher=Daily%20Headline%20360&tags=Technology,Sports&search=starlink
     app.get("/approved/articles", async (req, res) => {
       const { publisher, tags, search } = req.query;
@@ -187,6 +203,16 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await articlesCollection.deleteOne(query);
       res.send(result);
+    });
+
+    //* article view Increase
+    app.patch("/articles/view-Increase/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      const result = await articlesCollection.updateOne(query,{ $inc: { views: 1 } }
+      );
+      res.send(result)
     });
 
     // Send a ping to confirm a successful connection
