@@ -4,6 +4,7 @@ const app = express();
 const prot = process.env.prot || 5000;
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 //*middleware
 app.use(cors());
@@ -116,20 +117,45 @@ async function run() {
     //* get all premium articles
     app.get("/premium-articles", async (req, res) => {
       const result = await articlesCollection
-        .find({isPremium: true})
+        .find({ isPremium: true })
         .sort({ posted_date: -1 })
         .toArray();
       res.send(result);
     });
 
+    //* get my articles
+    app.get("/my-articles/:email", async (req, res) => {
+      const email = req.params.email;
+      const filter = { creator_email: email};
+      const result = await articlesCollection
+        .find(filter)
+        .sort({ posted_date: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    //* approve article update
+    app.patch("/articles/update/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateData = req.body;
+      console.log(updateData)
+      const updateDoc = {
+        $set: updateData,
+      };
+
+      const result = await articlesCollection.updateOne(query, updateDoc, {upsert: true});
+      res.send(result);
+    });
+
     //* get single article
     app.get("/article-details/:id", async (req, res) => {
-      const query = {_id: new ObjectId(req.params.id)};
+      const query = { _id: new ObjectId(req.params.id) };
       const result = await articlesCollection.findOne(query);
       res.send(result);
     });
 
-    //* GET /articles?publisher=Daily%20Headline%20360&tags=Technology,Sports&search=starlink
+    //* get approved articles
     app.get("/approved/articles", async (req, res) => {
       const { publisher, tags, search } = req.query;
 
@@ -159,7 +185,7 @@ async function run() {
       res.send(result);
     });
 
-    //* approve article
+    //* approve article update
     app.patch("/approve/article/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -210,9 +236,45 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
 
-      const result = await articlesCollection.updateOne(query,{ $inc: { views: 1 } }
-      );
-      res.send(result)
+      const result = await articlesCollection.updateOne(query, {
+        $inc: { views: 1 },
+      });
+      res.send(result);
+    });
+
+
+
+
+
+
+
+
+
+
+
+
+    //* Stripe payment 
+    app.post('/create-payment-intent', async (req, res) => {
+      try {
+        const { amount, currency } = req.body;
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount,
+          currency,
+        });
+        res.json({ clientSecret: paymentIntent.client_secret });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    //* subscription
+    app.patch("/users/subscription/:email", async (req, res) => {
+      const query = { email: req.params.email };
+      const {expireTime} = req.body;
+      const result = await UsersCollection.updateOne(query, {
+        $set: { premiumToken: expireTime },
+      });
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
