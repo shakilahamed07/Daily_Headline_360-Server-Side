@@ -4,7 +4,7 @@ const app = express();
 const prot = process.env.prot || 5000;
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 //*middleware
 app.use(cors());
@@ -126,7 +126,7 @@ async function run() {
     //* get my articles
     app.get("/my-articles/:email", async (req, res) => {
       const email = req.params.email;
-      const filter = { creator_email: email};
+      const filter = { creator_email: email };
       const result = await articlesCollection
         .find(filter)
         .sort({ posted_date: -1 })
@@ -139,12 +139,14 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateData = req.body;
-      console.log(updateData)
+      console.log(updateData);
       const updateDoc = {
         $set: updateData,
       };
 
-      const result = await articlesCollection.updateOne(query, updateDoc, {upsert: true});
+      const result = await articlesCollection.updateOne(query, updateDoc, {
+        upsert: true,
+      });
       res.send(result);
     });
 
@@ -242,19 +244,8 @@ async function run() {
       res.send(result);
     });
 
-
-
-
-
-
-
-
-
-
-
-
-    //* Stripe payment 
-    app.post('/create-payment-intent', async (req, res) => {
+    //* Stripe payment
+    app.post("/create-payment-intent", async (req, res) => {
       try {
         const { amount, currency } = req.body;
         const paymentIntent = await stripe.paymentIntents.create({
@@ -270,12 +261,24 @@ async function run() {
     //* subscription
     app.patch("/users/subscription/:email", async (req, res) => {
       const query = { email: req.params.email };
-      const {expireTime} = req.body;
+      const { expireTime } = req.body;
       const result = await UsersCollection.updateOne(query, {
         $set: { premiumToken: expireTime },
       });
       res.send(result);
     });
+
+    //* PATCH premium-null
+    app.patch("/users/premium-null/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await UsersCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { premiumToken: null } }
+      );
+      res.send(result);
+    });
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
