@@ -12,7 +12,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 app.use(cors());
 app.use(express.json());
 
-//& JWT token Verify
+//~ JWT token Verify
 const verifyJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -64,7 +64,7 @@ async function run() {
       .db("Daily-Headline-360-DB")
       .collection("payments");
 
-    //& Admin verify
+    //~ Admin verify
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
       const query = { email };
@@ -76,7 +76,7 @@ async function run() {
       next();
     };
 
-    //& Create jwt token
+    //~ Create jwt token
     app.post("/jwt", (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, secretKey, { expiresIn: "30d" });
@@ -235,9 +235,23 @@ async function run() {
     //& add articles DB
     app.post("/articles", verifyJWT, async (req, res) => {
       const articleData = req.body;
-      const result = await articlesCollection.insertOne(articleData);
+      const email = req.decoded.email;
 
-      res.send(result);
+      const userInfo = await UsersCollection.findOne({ email });
+      const premiumUser = userInfo.premiumToken;
+
+      if (premiumUser) {
+        const result = await articlesCollection.insertOne(articleData);
+        return res.send(result);
+      } else {
+        const isExist = await articlesCollection.findOne({creator_email: email});
+
+        if (!isExist) {
+          const result = await articlesCollection.insertOne(articleData);
+          return res.send(result);
+        }
+        res.status(404).send({ message: `Normal user can post 1 article` });
+      }
     });
 
     //& get all articles
