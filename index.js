@@ -4,11 +4,35 @@ const app = express();
 const prot = process.env.prot || 5000;
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const jwt = require('jsonwebtoken');
+const secretKey = process.env.JWT_SECRET;
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 //*middleware
 app.use(cors());
 app.use(express.json());
+
+//& JWT token Verify
+const verifyJWT = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).send({ message: "Unauthorized" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorize access" });
+  }
+
+  jwt.verify(token, secretKey, (err, decoded) => {
+    if (err) return res.status(403).send({ message: "Forbidden" });
+    req.decoded = decoded;
+    next();
+  });
+}
+
 
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.USER_PASS}@cluster3.ktrbfs3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster3`;
 
@@ -33,6 +57,28 @@ async function run() {
     const articlesCollection = client
       .db("Daily-Headline-360-DB")
       .collection("articles");
+    const paymentsCollection = client
+      .db("Daily-Headline-360-DB")
+      .collection("payments");
+
+    //& Create jwt token
+    app.post('/jwt', (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, secretKey, { expiresIn: '30d' });
+      res.send({ token });
+    });
+
+    //& Admin verify
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email };
+      const user = await UsersCollection.findOne(query);
+
+      if (!user || user.role !== "admin") {
+        return res.status(403).send({ message: "Forbidden access" });
+      }
+      next();
+    };
 
     //* read
     app.get("/users", async (req, res) => {
@@ -40,14 +86,56 @@ async function run() {
       res.send(result);
     });
 
-    //* user role
-    app.get("/users/role/:email", async (req, res) => {
+    // //* users statistics
+    // app.get('/users/statistics', async (req, res) => {
+    //   try {
+    //     const result = await UsersCollection.aggregate([
+    //       {
+    //         $facet: {
+    //           total: [{ $count: "count" }],
+    //           normalUsers: [
+    //             { $match: { role: "user", premiumToken: null } },
+    //             { $count: "count" }
+    //           ],
+    //           premiumUsers: [
+    //             { $match: { role: "user", premiumToken: { $ne: null } } },
+    //             { $count: "count" }
+    //           ]
+    //         }
+    //       },
+    //       {
+    //         $project: {
+    //           total: { $ifNull: [{ $arrayElemAt: ["$total.count", 0] }, 0] },
+    //           normalUsers: { $ifNull: [{ $arrayElemAt: ["$normalUsers.count", 0] }, 0] },
+    //           premiumUsers: { $ifNull: [{ $arrayElemAt: ["$premiumUsers.count", 0] }, 0] }
+    //         }
+    //       }
+    //     ]).toArray();
+
+    //     res.send(result[0]);
+    //   } catch (err) {
+    //     res.status(500).send({ error: "Failed to fetch statistics" });
+    //   }
+    // });
+
+    //& user role
+    app.get("/users/role/:email", verifyJWT, async (req, res) => {
       const query = { email: req.params.email };
       const result = await UsersCollection.findOne(query);
       res.send(result);
     });
 
-    //* create users DB
+    //! make admin
+    app.patch("/users/admin/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const { id } = req.params;
+      const result = await UsersCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { role: "admin" } }
+      );
+      res.send(result);
+    });
+
+    //* create users DB 
     app.post("/users", async (req, res) => {
       const { email, name, img } = req.body;
       console.log(email);
@@ -79,8 +167,8 @@ async function run() {
       res.send(result);
     });
 
-    //* add publisher DB
-    app.post("/publishers", async (req, res) => {
+    //! add publisher DB
+    app.post("/publishers", verifyJWT, verifyAdmin, async (req, res) => {
       const { name, logo } = req.body;
       const result = await publishersCollection.insertOne({
         name,
@@ -97,16 +185,16 @@ async function run() {
       res.send(result);
     });
 
-    //* add articles DB
-    app.post("/articles", async (req, res) => {
+    //& add articles DB
+    app.post("/articles", verifyJWT, async (req, res) => {
       const articleData = req.body;
       const result = await articlesCollection.insertOne(articleData);
 
       res.send(result);
     });
 
-    //* get all articles
-    app.get("/articles", async (req, res) => {
+    //& get all articles
+    app.get("/articles", verifyJWT, async (req, res) => {
       const result = await articlesCollection
         .find()
         .sort({ posted_date: -1 })
@@ -114,8 +202,19 @@ async function run() {
       res.send(result);
     });
 
-    //* get all premium articles
-    app.get("/premium-articles", async (req, res) => {
+    //* top 6 views article
+    app.get("/articles/trending", async (req, res) => {
+      const trending = await articlesCollection
+        .find({ status: "approved" })
+        .sort({ views: -1 })
+        .limit(6)
+        .toArray();
+
+      res.send(trending);
+    });
+
+    //& get all premium articles
+    app.get("/premium-articles", verifyJWT, async (req, res) => {
       const result = await articlesCollection
         .find({ isPremium: true })
         .sort({ posted_date: -1 })
@@ -123,8 +222,8 @@ async function run() {
       res.send(result);
     });
 
-    //* get my articles
-    app.get("/my-articles/:email", async (req, res) => {
+    //& get my articles
+    app.get("/my-articles/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const filter = { creator_email: email };
       const result = await articlesCollection
@@ -134,8 +233,8 @@ async function run() {
       res.send(result);
     });
 
-    //* approve article update
-    app.patch("/articles/update/:id", async (req, res) => {
+    //& approve article update
+    app.patch("/articles/update/:id",  verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateData = req.body;
@@ -150,8 +249,8 @@ async function run() {
       res.send(result);
     });
 
-    //* get single article
-    app.get("/article-details/:id", async (req, res) => {
+    //& get single article
+    app.get("/article-details/:id",  verifyJWT, async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await articlesCollection.findOne(query);
       res.send(result);
@@ -187,8 +286,8 @@ async function run() {
       res.send(result);
     });
 
-    //* approve article update
-    app.patch("/approve/article/:id", async (req, res) => {
+    //! approve article update
+    app.patch("/approve/article/:id",  verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -199,8 +298,8 @@ async function run() {
       res.send(result);
     });
 
-    //* premium or free article
-    app.patch("/premium/article/:id", async (req, res) => {
+    //! premium or free article
+    app.patch("/premium/article/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const value = req.body.value;
       const query = { _id: new ObjectId(id) };
@@ -212,8 +311,8 @@ async function run() {
       res.send(result);
     });
 
-    //*  article decline
-    app.patch("/articles/decline/:declineId", async (req, res) => {
+    //! article decline
+    app.patch("/articles/decline/:declineId", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.declineId;
       const reason = req.body.reason;
       const query = { _id: new ObjectId(id) };
@@ -225,7 +324,7 @@ async function run() {
       res.send(result);
     });
 
-    //* Delate article
+    //& Delate article
     app.delete("/delete/article/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -233,8 +332,8 @@ async function run() {
       res.send(result);
     });
 
-    //* article view Increase
-    app.patch("/articles/view-Increase/:id", async (req, res) => {
+    //& article view Increase
+    app.patch("/articles/view-Increase/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
 
@@ -244,8 +343,8 @@ async function run() {
       res.send(result);
     });
 
-    //* Stripe payment
-    app.post("/create-payment-intent", async (req, res) => {
+    //& Stripe payment
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       try {
         const { amount, currency } = req.body;
         const paymentIntent = await stripe.paymentIntents.create({
@@ -258,8 +357,15 @@ async function run() {
       }
     });
 
-    //* subscription
-    app.patch("/users/subscription/:email", async (req, res) => {
+    //& save payment history
+    app.post("/payments", verifyJWT, async (req, res) => {
+      const data = req.body;
+      const result = await paymentsCollection.insertOne(data);
+      res.send(result);
+    });
+
+    //& subscription
+    app.patch("/users/subscription/:email", verifyJWT, async (req, res) => {
       const query = { email: req.params.email };
       const { expireTime } = req.body;
       const result = await UsersCollection.updateOne(query, {
@@ -268,8 +374,8 @@ async function run() {
       res.send(result);
     });
 
-    //* PATCH premium-null
-    app.patch("/users/premium-null/:id", async (req, res) => {
+    //& PATCH premium-null
+    app.patch("/users/premium-null/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const result = await UsersCollection.updateOne(
         { _id: new ObjectId(id) },
@@ -277,6 +383,129 @@ async function run() {
       );
       res.send(result);
     });
+
+    //! Admin statistics
+    app.get("/dashboard/article-stats",verifyJWT, verifyAdmin, async (req, res) => {
+      try {
+        const result = await articlesCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$publisher",
+                count: { $sum: 1 },
+              },
+            },
+            {
+              $project: {
+                publisher: "$_id",
+                count: 1,
+                _id: 0,
+              },
+            },
+          ])
+          .toArray();
+
+        const total = result.reduce((sum, pub) => sum + pub.count, 0);
+
+        const percentageData = result.map((pub) => ({
+          publisher: pub.publisher,
+          percentage: ((pub.count / total) * 100).toFixed(2),
+        }));
+
+        res.send(percentageData);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    //! Admin statistics
+    app.get("/income/weekly",verifyJWT, verifyAdmin, async (req, res) => {
+      try {
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(today.getDate() - 6);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+
+        const result = await paymentsCollection
+          .aggregate([
+            {
+              $addFields: {
+                payDateConverted: { $toDate: "$pay_date" },
+              },
+            },
+            {
+              $match: {
+                payDateConverted: {
+                  $gte: sevenDaysAgo,
+                  $lte: today,
+                },
+              },
+            },
+            {
+              $group: {
+                _id: {
+                  $dateToString: {
+                    format: "%Y-%m-%d",
+                    date: "$payDateConverted",
+                  },
+                },
+                totalIncome: { $sum: "$amount" },
+              },
+            },
+            {
+              $sort: { _id: 1 },
+            },
+          ])
+          .toArray();
+
+        res.send(result);
+      } catch (err) {
+        console.error("Income aggregation error:", err);
+        res.status(500).send({ error: "Failed to fetch income data" });
+      }
+    });
+
+    //! Admin statistics
+    app.get("/articles/top-views",verifyJWT, verifyAdmin, async (req, res) => {
+      try {
+        const result = await articlesCollection
+          .aggregate([
+            {
+              $match: { status: "approved" }, 
+            },
+            {
+              $sort: { views: -1 },
+            },
+            {
+              $limit: 5,
+            },
+            {
+              $project: {
+                _id: 0,
+                title: 1,
+                publisher: 1,
+                views: 1,
+              },
+            },
+          ])
+          .toArray();
+
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ error: "Failed to fetch top viewed articles" });
+      }
+    });
+
+
+    //*
+
+
+
+
+
 
 
 
