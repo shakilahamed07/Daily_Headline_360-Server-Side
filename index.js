@@ -4,7 +4,7 @@ const app = express();
 const prot = process.env.prot || 5000;
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 const secretKey = process.env.JWT_SECRET;
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -31,8 +31,7 @@ const verifyJWT = (req, res, next) => {
     req.decoded = decoded;
     next();
   });
-}
-
+};
 
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.USER_PASS}@cluster3.ktrbfs3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster3`;
 
@@ -48,25 +47,22 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     await client.connect();
+
     const UsersCollection = client
       .db("Daily-Headline-360-DB")
       .collection("users");
+
     const publishersCollection = client
       .db("Daily-Headline-360-DB")
       .collection("publishers");
+
     const articlesCollection = client
       .db("Daily-Headline-360-DB")
       .collection("articles");
+
     const paymentsCollection = client
       .db("Daily-Headline-360-DB")
       .collection("payments");
-
-    //& Create jwt token
-    app.post('/jwt', (req, res) => {
-      const user = req.body;
-      const token = jwt.sign(user, secretKey, { expiresIn: '30d' });
-      res.send({ token });
-    });
 
     //& Admin verify
     const verifyAdmin = async (req, res, next) => {
@@ -80,43 +76,94 @@ async function run() {
       next();
     };
 
-    //* read
-    app.get("/users", async (req, res) => {
+    //& Create jwt token
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, secretKey, { expiresIn: "30d" });
+      res.send({ token });
+    });
+
+    //& All users
+    app.get("/users", verifyJWT, async (req, res) => {
       const result = await UsersCollection.find().toArray();
       res.send(result);
     });
 
-    // //* users statistics
-    // app.get('/users/statistics', async (req, res) => {
-    //   try {
-    //     const result = await UsersCollection.aggregate([
-    //       {
-    //         $facet: {
-    //           total: [{ $count: "count" }],
-    //           normalUsers: [
-    //             { $match: { role: "user", premiumToken: null } },
-    //             { $count: "count" }
-    //           ],
-    //           premiumUsers: [
-    //             { $match: { role: "user", premiumToken: { $ne: null } } },
-    //             { $count: "count" }
-    //           ]
-    //         }
-    //       },
-    //       {
-    //         $project: {
-    //           total: { $ifNull: [{ $arrayElemAt: ["$total.count", 0] }, 0] },
-    //           normalUsers: { $ifNull: [{ $arrayElemAt: ["$normalUsers.count", 0] }, 0] },
-    //           premiumUsers: { $ifNull: [{ $arrayElemAt: ["$premiumUsers.count", 0] }, 0] }
-    //         }
-    //       }
-    //     ]).toArray();
+    //* only premiumToken show
+    app.get("/user/premiumToken/:email", async (req, res) => {
+      const email = req.params.email;
 
-    //     res.send(result[0]);
-    //   } catch (err) {
-    //     res.status(500).send({ error: "Failed to fetch statistics" });
-    //   }
-    // });
+      try {
+        const user = await UsersCollection.findOne(
+          { email: email },
+          { projection: { premiumToken: 1, _id: 1 } }
+        );
+        res.send(user);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to fetch user" });
+      }
+    });
+
+    // //* users statistics
+    app.get("/users/statistics", async (req, res) => {
+      try {
+        const result = await UsersCollection.aggregate([
+          {
+            $facet: {
+              total: [{ $count: "count" }],
+              normalUsers: [
+                {
+                  $match: {
+                    role: "user",
+                    premiumToken: null,
+                  },
+                },
+                { $count: "count" },
+              ],
+              premiumUsers: [
+                {
+                  $match: {
+                    premiumToken: { $ne: null },
+                  },
+                },
+                { $count: "count" },
+              ],
+            },
+          },
+          {
+            $project: {
+              total: {
+                $cond: {
+                  if: { $gt: [{ $size: "$total" }, 0] },
+                  then: { $arrayElemAt: ["$total.count", 0] },
+                  else: 0,
+                },
+              },
+              normalUsers: {
+                $cond: {
+                  if: { $gt: [{ $size: "$normalUsers" }, 0] },
+                  then: { $arrayElemAt: ["$normalUsers.count", 0] },
+                  else: 0,
+                },
+              },
+              premiumUsers: {
+                $cond: {
+                  if: { $gt: [{ $size: "$premiumUsers" }, 0] },
+                  then: { $arrayElemAt: ["$premiumUsers.count", 0] },
+                  else: 0,
+                },
+              },
+            },
+          },
+        ]).toArray();
+
+        res.send(result[0]);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to fetch statistics" });
+      }
+    });
 
     //& user role
     app.get("/users/role/:email", verifyJWT, async (req, res) => {
@@ -135,7 +182,7 @@ async function run() {
       res.send(result);
     });
 
-    //* create users DB 
+    //* create users DB
     app.post("/users", async (req, res) => {
       const { email, name, img } = req.body;
       console.log(email);
@@ -234,7 +281,7 @@ async function run() {
     });
 
     //& approve article update
-    app.patch("/articles/update/:id",  verifyJWT, async (req, res) => {
+    app.patch("/articles/update/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateData = req.body;
@@ -250,7 +297,7 @@ async function run() {
     });
 
     //& get single article
-    app.get("/article-details/:id",  verifyJWT, async (req, res) => {
+    app.get("/article-details/:id", verifyJWT, async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await articlesCollection.findOne(query);
       res.send(result);
@@ -287,42 +334,57 @@ async function run() {
     });
 
     //! approve article update
-    app.patch("/approve/article/:id",  verifyJWT, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: { status: "approved" },
-      };
+    app.patch(
+      "/approve/article/:id",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: { status: "approved" },
+        };
 
-      const result = await articlesCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
+        const result = await articlesCollection.updateOne(query, updateDoc);
+        res.send(result);
+      }
+    );
 
     //! premium or free article
-    app.patch("/premium/article/:id", verifyJWT, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const value = req.body.value;
-      const query = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: { isPremium: value },
-      };
+    app.patch(
+      "/premium/article/:id",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const value = req.body.value;
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: { isPremium: value },
+        };
 
-      const result = await articlesCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
+        const result = await articlesCollection.updateOne(query, updateDoc);
+        res.send(result);
+      }
+    );
 
     //! article decline
-    app.patch("/articles/decline/:declineId", verifyJWT, verifyAdmin, async (req, res) => {
-      const id = req.params.declineId;
-      const reason = req.body.reason;
-      const query = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: { decline_reason: reason, status: "decline" },
-      };
+    app.patch(
+      "/articles/decline/:declineId",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.declineId;
+        const reason = req.body.reason;
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: { decline_reason: reason, status: "decline" },
+        };
 
-      const result = await articlesCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
+        const result = await articlesCollection.updateOne(query, updateDoc);
+        res.send(result);
+      }
+    );
 
     //& Delate article
     app.delete("/delete/article/:id", async (req, res) => {
@@ -385,42 +447,50 @@ async function run() {
     });
 
     //! Admin statistics
-    app.get("/dashboard/article-stats",verifyJWT, verifyAdmin, async (req, res) => {
-      try {
-        const result = await articlesCollection
-          .aggregate([
-            {
-              $group: {
-                _id: "$publisher",
-                count: { $sum: 1 },
+    app.get(
+      "/dashboard/article-stats",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const result = await articlesCollection
+            .aggregate([
+              {
+                $match: { status: "approved" }, // ✅ Only approved articles
               },
-            },
-            {
-              $project: {
-                publisher: "$_id",
-                count: 1,
-                _id: 0,
+              {
+                $group: {
+                  _id: "$publisher",
+                  count: { $sum: 1 },
+                },
               },
-            },
-          ])
-          .toArray();
+              {
+                $project: {
+                  publisher: "$_id",
+                  count: 1,
+                  _id: 0,
+                },
+              },
+            ])
+            .toArray();
 
-        const total = result.reduce((sum, pub) => sum + pub.count, 0);
+          const total = result.reduce((sum, pub) => sum + pub.count, 0);
 
-        const percentageData = result.map((pub) => ({
-          publisher: pub.publisher,
-          percentage: ((pub.count / total) * 100).toFixed(2),
-        }));
+          const percentageData = result.map((pub) => ({
+            publisher: pub.publisher,
+            percentage: ((pub.count / total) * 100).toFixed(2),
+          }));
 
-        res.send(percentageData);
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ message: "Server Error" });
+          res.send(percentageData);
+        } catch (err) {
+          console.error(err);
+          res.status(500).send({ error: "Failed to fetch article stats" });
+        }
       }
-    });
+    );
 
     //! Admin statistics
-    app.get("/income/weekly",verifyJWT, verifyAdmin, async (req, res) => {
+    app.get("/income/weekly", verifyJWT, verifyAdmin, async (req, res) => {
       try {
         const today = new Date();
         today.setHours(23, 59, 59, 999);
@@ -469,12 +539,12 @@ async function run() {
     });
 
     //! Admin statistics
-    app.get("/articles/top-views",verifyJWT, verifyAdmin, async (req, res) => {
+    app.get("/articles/top-views", verifyJWT, verifyAdmin, async (req, res) => {
       try {
         const result = await articlesCollection
           .aggregate([
             {
-              $match: { status: "approved" }, 
+              $match: { status: "approved" },
             },
             {
               $sort: { views: -1 },
@@ -499,15 +569,7 @@ async function run() {
       }
     });
 
-
     //*
-
-
-
-
-
-
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
