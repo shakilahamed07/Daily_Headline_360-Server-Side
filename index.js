@@ -84,8 +84,20 @@ async function run() {
     });
 
     //& All users
+    app.get("/users/count", verifyJWT, verifyAdmin, async (req, res) => {
+      const result = await UsersCollection.estimatedDocumentCount();
+      res.send(result);
+    });
+
+    //& All users
     app.get("/users", verifyJWT, async (req, res) => {
-      const result = await UsersCollection.find().toArray();
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
+      
+      const result = await UsersCollection.find()
+        .skip(page * size)
+        .limit(size)
+        .toArray();
       res.send(result);
     });
 
@@ -244,20 +256,35 @@ async function run() {
         const result = await articlesCollection.insertOne(articleData);
         return res.send(result);
       } else {
-        const isExist = await articlesCollection.findOne({creator_email: email});
+        const isExist = await articlesCollection.findOne({
+          creator_email: email,
+        });
 
         if (!isExist) {
           const result = await articlesCollection.insertOne(articleData);
           return res.send(result);
         }
-        res.status(404).send({ message: `Normal user can post 1 article` });
+        res.status(404).send({
+          message: `Normal user can post 1 article. You have already 1 article publish. Please subscribe.`,
+        });
       }
+    });
+
+    //& get all articles count
+    app.get("/articles/count", verifyJWT, async (req, res) => {
+      const result = await articlesCollection.estimatedDocumentCount();
+      res.send(result);
     });
 
     //& get all articles
     app.get("/articles", verifyJWT, async (req, res) => {
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
+
       const result = await articlesCollection
         .find()
+        .skip(page * size)
+        .limit(size)
         .sort({ posted_date: -1 })
         .toArray();
       res.send(result);
@@ -317,9 +344,19 @@ async function run() {
       res.send(result);
     });
 
+    //* approved articles count
+    app.get("/approved/articles/count-page", async (req, res) => {
+      const filter = { status: "approved" };
+      const result = await articlesCollection.find(filter).toArray();
+      const count = result.length;
+      res.send({ count });
+    });
+
     //* get approved articles
     app.get("/approved/articles", async (req, res) => {
       const { publisher, tags, search } = req.query;
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
 
       const filter = { status: "approved" };
 
@@ -341,9 +378,10 @@ async function run() {
 
       const result = await articlesCollection
         .find(filter)
+        .skip(page * size)
+        .limit(size)
         .sort({ posted_date: -1 })
         .toArray();
-
       res.send(result);
     });
 
@@ -534,6 +572,7 @@ async function run() {
                   $dateToString: {
                     format: "%Y-%m-%d",
                     date: "$payDateConverted",
+                    timezone: "Asia/Dhaka",
                   },
                 },
                 totalIncome: { $sum: "$amount" },
