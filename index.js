@@ -7,6 +7,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const secretKey = process.env.JWT_SECRET;
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const nodemailer = require("nodemailer");
 
 //*middleware
 app.use(cors());
@@ -93,7 +94,7 @@ async function run() {
     app.get("/users", verifyJWT, async (req, res) => {
       const page = parseInt(req.query.page);
       const size = parseInt(req.query.size);
-      
+
       const result = await UsersCollection.find()
         .skip(page * size)
         .limit(size)
@@ -197,7 +198,6 @@ async function run() {
     //* create users DB
     app.post("/users", async (req, res) => {
       const { email, name, img } = req.body;
-      console.log(email);
 
       const user = {
         name,
@@ -622,7 +622,41 @@ async function run() {
       }
     });
 
-    //*
+    //& contact us
+    app.post("/contact", verifyJWT, async (req, res) => {
+      const { name, email, phone, message } = req.body;
+    
+      if (!name || !email || !phone || !message) {
+        return res.status(400).send({ error: "All fields are required" });
+      }
+    
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+    
+      try {
+        await transporter.sendMail({
+          from: email,
+          to: process.env.EMAIL_USER,
+          subject: `New Contact Message from ${name}`,
+          text: `
+            Name: ${name}
+            Email: ${email}
+            Phone: ${phone}
+            Message: ${message}
+          `,
+        });
+    
+        res.send({ success: true, message: "Message sent successfully!" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Message failed to send" });
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
