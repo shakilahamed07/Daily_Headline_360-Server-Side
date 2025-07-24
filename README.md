@@ -1,11 +1,11 @@
-# Daily Headline 360
+# Daily Headline 360 (Backend)
 
 **Daily Headline 360** is a full-stack news sharing web application. This repository contains the **back-end** implementation.
 
 ---
 
 ## 🔗 Live Link
-[Live Website](#)
+[Live Website](https://daily-headline-360.netlify.app/)
 
 ## 🔐 Admin Credentials
 - **Email:** `your-admin-email@example.com`
