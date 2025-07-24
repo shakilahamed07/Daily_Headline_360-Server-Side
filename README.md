@@ -1,71 +1,78 @@
-## Daily Headline 360
-This is a news shearing web application. It is a full-stuck application. Back-end part.
+# Daily Headline 360
 
-## Live link :
-## Admin email : 
-## Password : 
+**Daily Headline 360** is a full-stack news sharing web application. This repository contains the **back-end** implementation.
 
-## Futures 
-1. User-friendly UI (fully responsive)
+---
 
-2. SEO-friendly
+## 🔗 Live Link
+[Live Website](#)
 
-3. User Authentication and Login system
+## 🔐 Admin Credentials
+- **Email:** `your-admin-email@example.com`
+- **Password:** `your-admin-password`
 
-4. JWT for Authorization
+---
 
-5. A normal user can post only one article. If the user is premium, they can post unlimited articles.
+## ✨ Features
 
-6. If an article is approved by the admin, the status will show as "Approved". If declined, the status will show as "Declined". Otherwise, the status will be "Pending". If the article is declined, there will be a button beside the "Declined" status. Clicking that button will open a modal displaying the reason written by the admin for declining.
+1. **User-friendly UI** (fully responsive)
+2. **SEO-friendly** structure
+3. **User authentication and login system**
+4. **JWT-based authorization**
+5. **Article Posting Rules**:
+   - Normal users can post only **one** article.
+   - **Premium** users can post **unlimited** articles.
+6. **Article Status System**:
+   - Approved articles show status as `"Approved"`.
+   - Declined articles show `"Declined"` with a **reason modal**.
+   - Pending articles remain in `"Pending"` status until reviewed.
+7. **Trending Articles Section**: Homepage includes 6 trending articles with a slider.
+8. **Subscription System**:
+   - Automatically revokes premium status if the subscription period ends.
+9. **Admin Dashboard**
+10. **Role-Based Access Control** (Admin, Premium User, Normal User)
+11. **Stripe Integration** for international payments
 
-7. Homepage includes 6 trending articles (with slider)
+---
 
-8. Subscription system (if the subscription date is over, the premium user will automatically be changed to a normal user)
+## 🛠️ Back-End Technologies
 
-9. Admin Dashboard
+- **Node.js**
+- **Express.js**
+- **MongoDB**
+- **REST APIs**
 
-10. Role-based access
+---
 
-11. International payment gateway (Stripe) integration
+## 🧩 Middleware & NPM Packages Used
 
-## Back-End Technology 
-1. node.js
-2. express.js
-3. MongoDB
-4. REST APIs
+- `cors`
+- `express`
+- `nodemon`
+- `dotenv`
+- `jsonwebtoken` (JWT)
+- `stripe`
+- `nodemailer`
+- `mongodb`
 
-## middleware & npm package
-1. cors
-2. express
-3. nodemon
-4. dotenv 
-5. JWT
-6. stripe
-7. nodemailer
-8. mongodb
+---
 
-## deploy (Vercel)
+## 🚀 Deployment
+
+- Deployed with **Vercel** *(mention if frontend or backend)*
+
+---
+
+## 📌 Notes
+
+- This project is part of a full-stack web application.
+- Frontend and backend are deployed separately.
+
+---
+
+## 📫 Contact
+
+For any issues or queries, feel free to open an issue or contact the developer.
 
 
 
-- ✅ **User-friendly UI** – Fully responsive across all devices  
-- ✅ **SEO-friendly** – Optimized for search engines  
-- ✅ **User Authentication and Login System**  
-- ✅ **JWT (JSON Web Token) Authorization**  
-- ✅ **Post Limit Based on Role**  
-  - Normal users can post only **1 article**  
-  - Premium users can post **unlimited articles**  
-- ✅ **Article Status Management**  
-  - Status can be **Approved**, **Declined**, or **Pending**  
-  - If Declined:  
-    - A button appears beside the status  
-    - Clicking opens a **modal** showing the **admin’s reason** for declining  
-- ✅ **Homepage Features**  
-  - Displays **6 trending articles**  
-  - Includes a **responsive slider**  
-- ✅ **Subscription System**  
-  - If subscription expires, the **premium user is automatically downgraded** to a normal user  
-- ✅ **Admin Dashboard**  
-- ✅ **Role-Based Access Control**  
-- ✅ **International Payment Gateway Integration**  
-  - Using **Stripe**
