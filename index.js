@@ -301,6 +301,17 @@ async function run() {
       res.send(trending);
     });
 
+    //* latest news 
+    app.get("/latest/articles", async (req, res) => {
+      const trending = await articlesCollection
+        .find({ status: "approved" })
+        .sort({posted_date: -1})
+        .limit(3)
+        .toArray();
+
+      res.send(trending);
+    });
+
     //& get all premium articles
     app.get("/premium-articles", verifyJWT, async (req, res) => {
       const result = await articlesCollection
