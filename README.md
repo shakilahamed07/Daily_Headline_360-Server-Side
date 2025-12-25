@@ -59,7 +59,7 @@
 
 ## 🚀 Deployment
 
-- Deployed with **Vercel** backend
+- Deployed with **Vercel** for backend
 
 ---
 
